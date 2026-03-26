@@ -1171,10 +1171,10 @@ function onStreamTrailers() {
 // Submit an RST-STREAM frame to be sent to the remote peer.
 // This will cause the Http2Stream to be closed.
 function submitRstStream(code) {
-  if (this[kHandle] !== undefined) {
-    this[kHandle].rstStream(code);
-    scheduleSendPending(this[kSession]);
-  }
+  if (!session) return;
+  const handle = session[kHandle];
+  if (!handle) return;
+  handle.sendPending();
 }
 
 function trackWriteState(stream, bytes) {
