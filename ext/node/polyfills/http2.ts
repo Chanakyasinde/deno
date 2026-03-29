@@ -228,7 +228,13 @@ function scheduleSendPending(session) {
   if (!session) return;
   const handle = session[kHandle];
   if (!handle) return;
-  handle.sendPending();
+  // Defer via queueMicrotask to avoid re-entrancy: nghttp2's
+  // send_pending_data can invoke callbacks that call back into JS ops.
+  queueMicrotask(() => {
+    if (session[kHandle]) {
+      session[kHandle].sendPending();
+    }
+  });
 }
 
 // HTTP2 Constants
@@ -569,16 +575,12 @@ function onStreamClose(code) {
     // deno-lint-ignore prefer-primordials
     stream.push(null);
 
-    // If the user hasn't tried to consume the stream (and this is a server
-    // session) then just dump the incoming data so that the stream can
-    // be destroyed.
+    // If the user hasn't tried to consume the stream, dump the incoming data
+    // so that the stream can be properly closed.
     if (
-      stream[kSession][kType] === NGHTTP2_SESSION_SERVER &&
       !stream[kState].didRead &&
       stream.readableFlowing === null
     ) {
-      stream.resume();
-    } else {
       stream.read(0);
     }
   }
@@ -1169,10 +1171,10 @@ function onStreamTrailers() {
 // Submit an RST-STREAM frame to be sent to the remote peer.
 // This will cause the Http2Stream to be closed.
 function submitRstStream(code) {
-  if (this[kHandle] !== undefined) {
-    this[kHandle].rstStream(code);
-    scheduleSendPending(this[kSession]);
-  }
+  if (!session) return;
+  const handle = session[kHandle];
+  if (!handle) return;
+  handle.sendPending();
 }
 
 function trackWriteState(stream, bytes) {
