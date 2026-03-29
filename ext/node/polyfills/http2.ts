@@ -228,13 +228,7 @@ function scheduleSendPending(session) {
   if (!session) return;
   const handle = session[kHandle];
   if (!handle) return;
-  // Defer via queueMicrotask to avoid re-entrancy: nghttp2's
-  // send_pending_data can invoke callbacks that call back into JS ops.
-  queueMicrotask(() => {
-    if (session[kHandle]) {
-      session[kHandle].sendPending();
-    }
-  });
+  handle.sendPending();
 }
 
 // HTTP2 Constants
@@ -578,6 +572,7 @@ function onStreamClose(code) {
     // If the user hasn't tried to consume the stream then just dump the
     // incoming data so that the stream can be destroyed.
     if (
+      stream[kSession][kType] === NGHTTP2_SESSION_SERVER &&
       !stream[kState].didRead &&
       stream.readableFlowing === null
     ) {
